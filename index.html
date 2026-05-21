@@ -5,7 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>時間凍結現場 - 菸蒂不落地</title>
     <style>
-        * { touch-action: manipulation; -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+        * {
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box;
+        }
         body {
             margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden;
             font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -13,10 +17,39 @@
             display: flex; align-items: center; justify-content: center;
             user-select: none;
         }
+
+        /* ========== 啟動畫面 ========== */
+        .start-screen {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; z-index: 500; color: white;
+            gap: 20px; padding: 20px;
+        }
+        .start-screen h1 {
+            font-size: 48px; font-weight: 900; letter-spacing: 5px;
+            color: #fbbf24; text-shadow: 0 0 20px rgba(251,191,36,0.5);
+            text-align: center; line-height: 1.3;
+        }
+        .start-screen .subtitle {
+            font-size: 22px; color: #cbd5e1; text-align: center;
+        }
+        .btn-start {
+            background: #f59e0b; color: #0f172a; border: none;
+            font-size: 32px; font-weight: 900; padding: 16px 50px;
+            border-radius: 40px; cursor: pointer; letter-spacing: 4px;
+            box-shadow: 0 10px 20px rgba(245,158,11,0.4);
+            transition: 0.15s; margin-top: 20px;
+        }
+        .btn-start:active { transform: scale(0.94); }
+
+        /* ========== 遊戲主容器 ========== */
         .game-container {
-            width: 100%; height: 100%; display: flex; flex-direction: column;
+            width: 100%; height: 100%; display: none; flex-direction: column;
             background: #111827; color: white;
         }
+        .game-container.active { display: flex; }
+
         /* 頂部 */
         .header {
             background: #1e293b; padding: 10px 18px;
@@ -25,22 +58,27 @@
         }
         .header-left { display: flex; align-items: center; gap: 8px; }
         .header-icon { font-size: 30px; }
-        .header-title { font-size: 24px; font-weight: 900; letter-spacing: 3px; color: #fbbf24; }
+        .header-title {
+            font-size: 24px; font-weight: 900; letter-spacing: 3px;
+            color: #fbbf24; text-shadow: 0 0 10px rgba(251,191,36,0.5);
+        }
         .btn-reset {
             background: #b91c1c; color: white; border: none;
             font-size: 18px; font-weight: bold; padding: 8px 20px;
             border-radius: 30px; cursor: pointer; letter-spacing: 1px;
-            box-shadow: 0 4px 8px rgba(185,28,28,0.5); transition: 0.15s;
+            box-shadow: 0 4px 8px rgba(185,28,28,0.5);
+            transition: 0.15s;
         }
+
         /* 影片舞台 */
         .stage-area {
             flex: 1; position: relative; overflow: hidden;
             display: flex; align-items: center; justify-content: center;
-            background: black; /* 影片未滿版時顯示黑邊 */
+            background: black;
         }
         #sceneVideo {
             width: 100%; height: 100%;
-            object-fit: contain; /* 維持比例，不裁切 */
+            object-fit: contain;
         }
         .freeze-overlay {
             position: absolute; top: 0; left: 0; right: 0; bottom: 0;
@@ -59,6 +97,7 @@
             0%,100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.8; transform: scale(0.95); }
         }
+
         /* 問題卡 */
         .question-card-area { flex-shrink: 0; padding: 10px 20px; }
         .question-card {
@@ -68,6 +107,7 @@
             color: #e2e8f0; text-align: center;
             box-shadow: 0 6px 12px rgba(0,0,0,0.4);
         }
+
         /* 操作欄 */
         .action-bar {
             background: #1e293b; padding: 14px 16px;
@@ -88,6 +128,7 @@
         .btn-ready { background: #f59e0b; color: #0f172a; font-size: 24px; flex: 2; }
         .btn-locked { opacity: 0.35; pointer-events: none; filter: grayscale(0.4); }
         .btn-hidden { display: none !important; }
+
         /* 結果彈窗 */
         .result-overlay {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -124,7 +165,15 @@
 </head>
 <body>
 
-<div class="game-container">
+<!-- 啟動畫面 -->
+<div class="start-screen" id="startScreen">
+    <h1>⏸️ 時間凍結現場</h1>
+    <div class="subtitle">菸蒂不落地，環境更美麗</div>
+    <button class="btn-start" onclick="startGame()">🚀 開始挑戰</button>
+</div>
+
+<!-- 遊戲主容器 -->
+<div class="game-container" id="gameContainer">
     <div class="header">
         <div class="header-left">
             <span class="header-icon">⏸️</span>
@@ -134,9 +183,7 @@
     </div>
 
     <div class="stage-area">
-        <!-- 影片元素 -->
         <video id="sceneVideo" muted playsinline preload="auto"></video>
-        <!-- 凍結濾鏡 -->
         <div class="freeze-overlay" id="freezeOverlay">
             <span class="freeze-text">⏸️ 凍結中</span>
         </div>
@@ -154,6 +201,7 @@
     </div>
 </div>
 
+<!-- 結果彈窗 -->
 <div class="result-overlay hidden" id="resultOverlay">
     <div class="result-card">
         <div class="result-emoji" id="resultEmoji"></div>
@@ -164,11 +212,13 @@
 </div>
 
 <script>
-    // ========== 題目庫（對應 10 支影片） ==========
+    // ========== 全域設定：所有影片統一的凍結時間（秒） ==========
+    const FREEZE_TIME = 8;  // ← 改成你影片實際的凍結秒數
+
+    // ========== 10 題完整資料 ==========
     const questions = [
         {
             videoSrc: 'videos/scene01.mp4',
-            freezeTime: 8,  // 影片播放到第 8 秒時凍結
             questionText: '公園長椅旁，阿伯抽完菸正準備丟進「一般垃圾桶」...\n⏸️ 時間凍結！你該怎麼做？',
             correct: 'collect',
             correctEmoji: '🎉',
@@ -177,17 +227,81 @@
         },
         {
             videoSrc: 'videos/scene02.mp4',
-            freezeTime: 8,
             questionText: '早餐店門口，老闆娘順手把地上的菸蒂掃進水溝...\n⏸️ 時間凍結！菸蒂該去哪裡？',
             correct: 'collect',
             correctEmoji: '✨',
             wrongEmoji: '🧹',
             explanation: '水溝通往溪流大海！正確做法：撿起來丟進收集桶！',
         },
-        // ... 補齊其餘 8 題，結構同上
+        {
+            videoSrc: 'videos/scene03.mp4',
+            questionText: '放學時間，校門口有家長把菸蒂往外一彈，掉在水溝蓋旁...\n⏸️ 時間凍結！這根菸蒂該怎麼處理？',
+            correct: 'collect',
+            correctEmoji: '🏆',
+            wrongEmoji: '🚗',
+            explanation: '校園周邊應該保持乾淨！請丟進收集桶，守護小朋友的環境。',
+        },
+        {
+            videoSrc: 'videos/scene04.mp4',
+            questionText: '公園沙坑邊，小朋友在玩沙，旁邊地上卻有一根菸蒂...\n⏸️ 時間凍結！為了小朋友的安全，該怎麼做？',
+            correct: 'collect',
+            correctEmoji: '🛡️',
+            wrongEmoji: '🛝',
+            explanation: '菸蒂的化學物質會滲入沙地，立刻撿起來丟進收集桶！',
+        },
+        {
+            videoSrc: 'videos/scene05.mp4',
+            questionText: '下雨天的街道，水流正把菸蒂沖向水溝...\n⏸️ 時間凍結！你要阻止它去哪裡？',
+            correct: 'collect',
+            correctEmoji: '🌈',
+            wrongEmoji: '🌧️',
+            explanation: '雨水會把菸蒂帶進河川海洋！快攔截它，丟進收集桶！',
+        },
+        {
+            videoSrc: 'videos/scene06.mp4',
+            questionText: '家裡陽台，阿嬤說菸蒂丟一般垃圾桶就會分解...\n⏸️ 時間凍結！這個觀念正確嗎？菸蒂該丟哪？',
+            correct: 'collect',
+            correctEmoji: '💡',
+            wrongEmoji: '👵',
+            explanation: '菸蒂濾嘴是塑膠做的，需要15年分解，一定要丟收集桶！',
+        },
+        {
+            videoSrc: 'videos/scene07.mp4',
+            questionText: '便利商店外，一位大哥想把菸蒂塞進騎樓縫隙...\n⏸️ 時間凍結！正確該丟哪裡？',
+            correct: 'collect',
+            correctEmoji: '👏',
+            wrongEmoji: '🚬',
+            explanation: '塞進縫隙的菸蒂還是會被沖進水溝！請勇敢勸導丟收集桶。',
+        },
+        {
+            videoSrc: 'videos/scene08.mp4',
+            questionText: '夜市收攤後，清潔人員把菸蒂和一般垃圾掃在一起...\n⏸️ 時間凍結！菸蒂可以跟一般垃圾一起丟嗎？',
+            correct: 'collect',
+            correctEmoji: '⭐',
+            wrongEmoji: '🌙',
+            explanation: '菸蒂最好單獨丟進收集桶，避免處理時造成污染。',
+        },
+        {
+            videoSrc: 'videos/scene09.mp4',
+            questionText: '釣魚池邊，釣客把菸蒂彈進水裡，還說魚不會在意...\n⏸️ 時間凍結！魚真的不在意嗎？菸蒂該丟哪？',
+            correct: 'collect',
+            correctEmoji: '🌊',
+            wrongEmoji: '🐟',
+            explanation: '菸蒂的毒物會溶入水中，毒害魚類。水不是垃圾桶！',
+        },
+        {
+            videoSrc: 'videos/scene10.mp4',
+            questionText: '走在路上，前面的人隨手把菸蒂往後一丟，差點丟到你...\n⏸️ 時間凍結！菸蒂該去哪？你想對他說什麼？',
+            correct: 'collect',
+            correctEmoji: '🏅',
+            wrongEmoji: '😤',
+            explanation: '勇敢有禮貌地勸導：「請丟進收集桶，我們一起愛護環境！」',
+        }
     ];
 
     // ========== DOM 元素 ==========
+    const startScreen = document.getElementById('startScreen');
+    const gameContainer = document.getElementById('gameContainer');
     const video = document.getElementById('sceneVideo');
     const freezeOverlay = document.getElementById('freezeOverlay');
     const questionCard = document.getElementById('questionCard');
@@ -205,29 +319,35 @@
     let usedQuestions = [];
     let freezeTimer = null;
 
+    // ========== 啟動遊戲 ==========
+    function startGame() {
+        startScreen.style.display = 'none';
+        gameContainer.classList.add('active');
+        loadNewQuestion();
+    }
+
     // ========== 影片控制 ==========
     function loadAndPlay(question) {
-        // 重置狀態
         clearStage();
         currentQuestion = question;
         video.src = question.videoSrc;
         video.currentTime = 0;
-        
-        // 監聽影片可播放後自動播放
+
+        // iOS 需要靜音且 playsinline，已設定
         video.oncanplay = () => {
-            video.play().catch(e => console.log('自動播放需使用者手勢，改為靜音播放', e));
+            video.play().catch(e => console.log('播放失敗，可能需使用者手勢', e));
         };
-        
-        // 設定凍結計時器
-        const freezeTime = question.freezeTime * 1000;
+
+        // 設定凍結計時器（統一使用全域 FREEZE_TIME）
+        const freezeMs = FREEZE_TIME * 1000;
         freezeTimer = setTimeout(() => {
             video.pause();
             freezeOverlay.classList.add('active');
             questionCard.textContent = question.questionText;
             lockButtons();
-        }, freezeTime);
+        }, freezeMs);
 
-        // 萬一影片播放完畢但還沒凍結（安全防線）
+        // 安全防線：影片自然結束但還沒凍結
         video.onended = () => {
             clearTimeout(freezeTimer);
             if (!freezeOverlay.classList.contains('active')) {
@@ -248,7 +368,7 @@
         resultOverlay.classList.add('hidden');
     }
 
-    // ========== 題目抽選 ==========
+    // ========== 題目隨機抽取 ==========
     function pickRandomQuestion() {
         if (usedQuestions.length >= questions.length) usedQuestions = [];
         const available = questions.filter((_, i) => !usedQuestions.includes(i));
@@ -263,7 +383,7 @@
         loadAndPlay(q);
     }
 
-    // ========== 按鈕控制 ==========
+    // ========== 按鈕狀態控制 ==========
     function lockButtons() {
         buttonsLocked = true;
         btnReady.classList.remove('btn-hidden');
@@ -271,6 +391,7 @@
         btnTrash.classList.add('btn-locked');
         btnDrain.classList.add('btn-locked');
     }
+
     function unlockButtons() {
         if (!buttonsLocked) return;
         buttonsLocked = false;
@@ -280,9 +401,11 @@
         btnDrain.classList.remove('btn-locked');
     }
 
+    // ========== 作答處理 ==========
     function submitAnswer(bucket) {
         if (buttonsLocked || !currentQuestion) return;
         buttonsLocked = true;
+
         const isCorrect = (bucket === currentQuestion.correct);
         resultEmoji.textContent = isCorrect ? currentQuestion.correctEmoji : currentQuestion.wrongEmoji;
         resultTitle.textContent = isCorrect ? '✨ 答對了！環保小尖兵！' : '哎呀，再想想看...';
@@ -304,9 +427,6 @@
         usedQuestions = [];
         loadNewQuestion();
     }
-
-    // ========== 初始化 ==========
-    loadNewQuestion();
 </script>
 </body>
 </html>
