@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>時間凍結現場 - 菸蒂不落地</title>
+    <style>
+        * { touch-action: manipulation; -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+        body {
+            margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden;
+            font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+            background: #0b1120;
+            display: flex; align-items: center; justify-content: center;
+            user-select: none;
+        }
+        .game-container {
+            width: 100%; height: 100%; display: flex; flex-direction: column;
+            background: #111827; color: white;
+        }
+        /* 頂部 */
+        .header {
+            background: #1e293b; padding: 10px 18px;
+            display: flex; align-items: center; justify-content: space-between;
+            flex-shrink: 0; border-bottom: 2px solid #334155;
+        }
+        .header-left { display: flex; align-items: center; gap: 8px; }
+        .header-icon { font-size: 30px; }
+        .header-title { font-size: 24px; font-weight: 900; letter-spacing: 3px; color: #fbbf24; }
+        .btn-reset {
+            background: #b91c1c; color: white; border: none;
+            font-size: 18px; font-weight: bold; padding: 8px 20px;
+            border-radius: 30px; cursor: pointer; letter-spacing: 1px;
+            box-shadow: 0 4px 8px rgba(185,28,28,0.5); transition: 0.15s;
+        }
+        /* 影片舞台 */
+        .stage-area {
+            flex: 1; position: relative; overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
+            background: black; /* 影片未滿版時顯示黑邊 */
+        }
+        #sceneVideo {
+            width: 100%; height: 100%;
+            object-fit: contain; /* 維持比例，不裁切 */
+        }
+        .freeze-overlay {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(30,41,59,0.75); backdrop-filter: blur(4px);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 20; pointer-events: none;
+            opacity: 0; transition: opacity 0.5s;
+        }
+        .freeze-overlay.active { opacity: 1; }
+        .freeze-text {
+            font-size: 40px; font-weight: 900; color: white;
+            letter-spacing: 6px; text-shadow: 0 0 20px rgba(255,255,255,0.7);
+            animation: freezePulse 1.5s infinite;
+        }
+        @keyframes freezePulse {
+            0%,100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(0.95); }
+        }
+        /* 問題卡 */
+        .question-card-area { flex-shrink: 0; padding: 10px 20px; }
+        .question-card {
+            background: #1e293b; border: 2px solid #475569;
+            border-radius: 20px; padding: 16px 20px;
+            font-size: 24px; font-weight: 700; line-height: 1.7;
+            color: #e2e8f0; text-align: center;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+        }
+        /* 操作欄 */
+        .action-bar {
+            background: #1e293b; padding: 14px 16px;
+            display: flex; gap: 10px; flex-shrink: 0;
+            border-top: 2px solid #334155;
+        }
+        .btn-action {
+            flex: 1; border: none; border-radius: 18px;
+            font-size: 22px; font-weight: 900; padding: 16px 6px;
+            cursor: pointer; transition: 0.15s; color: white;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            display: flex; align-items: center; justify-content: center;
+            gap: 4px;
+        }
+        .btn-collect { background: #15803d; }
+        .btn-trash   { background: #1d4ed8; }
+        .btn-drain   { background: #b91c1c; }
+        .btn-ready { background: #f59e0b; color: #0f172a; font-size: 24px; flex: 2; }
+        .btn-locked { opacity: 0.35; pointer-events: none; filter: grayscale(0.4); }
+        .btn-hidden { display: none !important; }
+        /* 結果彈窗 */
+        .result-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(12px);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 300;
+        }
+        .result-card {
+            background: #1e293b; border-radius: 28px; padding: 28px;
+            width: 85%; max-width: 600px; text-align: center;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+            border: 2px solid #475569;
+            animation: resultPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes resultPop {
+            from { transform: scale(0.7); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .result-emoji { font-size: 80px; margin-bottom: 8px; }
+        .result-title { font-size: 38px; font-weight: 900; margin: 10px 0; }
+        .correct-title { color: #4ade80; }
+        .wrong-title { color: #f87171; }
+        .explanation {
+            font-size: 22px; color: #cbd5e1; background: #0f172a;
+            padding: 16px; border-radius: 16px; margin: 14px 0; line-height: 1.7;
+        }
+        .btn-next {
+            background: #fbbf24; color: #0f172a; border: none;
+            font-size: 26px; font-weight: 900; padding: 14px 40px;
+            border-radius: 30px; cursor: pointer; letter-spacing: 3px;
+        }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <div class="header">
+        <div class="header-left">
+            <span class="header-icon">⏸️</span>
+            <span class="header-title">時間凍結現場</span>
+        </div>
+        <button class="btn-reset" onclick="resetGame()">🔄 換下一位</button>
+    </div>
+
+    <div class="stage-area">
+        <!-- 影片元素 -->
+        <video id="sceneVideo" muted playsinline preload="auto"></video>
+        <!-- 凍結濾鏡 -->
+        <div class="freeze-overlay" id="freezeOverlay">
+            <span class="freeze-text">⏸️ 凍結中</span>
+        </div>
+    </div>
+
+    <div class="question-card-area">
+        <div class="question-card" id="questionCard"></div>
+    </div>
+
+    <div class="action-bar" id="actionBar">
+        <button class="btn-action btn-ready" id="btnReady" onclick="unlockButtons()">🙋 我投好了！</button>
+        <button class="btn-action btn-collect btn-locked" id="btnCollect" onclick="submitAnswer('collect')">🟢 收集桶</button>
+        <button class="btn-action btn-trash btn-locked" id="btnTrash" onclick="submitAnswer('trash')">🔵 垃圾桶</button>
+        <button class="btn-action btn-drain btn-locked" id="btnDrain" onclick="submitAnswer('drain')">🔴 水溝</button>
+    </div>
+</div>
+
+<div class="result-overlay hidden" id="resultOverlay">
+    <div class="result-card">
+        <div class="result-emoji" id="resultEmoji"></div>
+        <div class="result-title" id="resultTitle"></div>
+        <div class="explanation" id="resultExplanation"></div>
+        <button class="btn-next" onclick="finishAndReset()">👋 下一位挑戰者</button>
+    </div>
+</div>
+
+<script>
+    // ========== 題目庫（對應 10 支影片） ==========
+    const questions = [
+        {
+            videoSrc: 'videos/scene01.mp4',
+            freezeTime: 8,  // 影片播放到第 8 秒時凍結
+            questionText: '公園長椅旁，阿伯抽完菸正準備丟進「一般垃圾桶」...\n⏸️ 時間凍結！你該怎麼做？',
+            correct: 'collect',
+            correctEmoji: '🎉',
+            wrongEmoji: '👴',
+            explanation: '菸蒂含有塑膠濾嘴與毒物，應該丟進「菸蒂專用收集桶」！',
+        },
+        {
+            videoSrc: 'videos/scene02.mp4',
+            freezeTime: 8,
+            questionText: '早餐店門口，老闆娘順手把地上的菸蒂掃進水溝...\n⏸️ 時間凍結！菸蒂該去哪裡？',
+            correct: 'collect',
+            correctEmoji: '✨',
+            wrongEmoji: '🧹',
+            explanation: '水溝通往溪流大海！正確做法：撿起來丟進收集桶！',
+        },
+        // ... 補齊其餘 8 題，結構同上
+    ];
+
+    // ========== DOM 元素 ==========
+    const video = document.getElementById('sceneVideo');
+    const freezeOverlay = document.getElementById('freezeOverlay');
+    const questionCard = document.getElementById('questionCard');
+    const btnReady = document.getElementById('btnReady');
+    const btnCollect = document.getElementById('btnCollect');
+    const btnTrash = document.getElementById('btnTrash');
+    const btnDrain = document.getElementById('btnDrain');
+    const resultOverlay = document.getElementById('resultOverlay');
+    const resultEmoji = document.getElementById('resultEmoji');
+    const resultTitle = document.getElementById('resultTitle');
+    const resultExplanation = document.getElementById('resultExplanation');
+
+    let currentQuestion = null;
+    let buttonsLocked = true;
+    let usedQuestions = [];
+    let freezeTimer = null;
+
+    // ========== 影片控制 ==========
+    function loadAndPlay(question) {
+        // 重置狀態
+        clearStage();
+        currentQuestion = question;
+        video.src = question.videoSrc;
+        video.currentTime = 0;
+        
+        // 監聽影片可播放後自動播放
+        video.oncanplay = () => {
+            video.play().catch(e => console.log('自動播放需使用者手勢，改為靜音播放', e));
+        };
+        
+        // 設定凍結計時器
+        const freezeTime = question.freezeTime * 1000;
+        freezeTimer = setTimeout(() => {
+            video.pause();
+            freezeOverlay.classList.add('active');
+            questionCard.textContent = question.questionText;
+            lockButtons();
+        }, freezeTime);
+
+        // 萬一影片播放完畢但還沒凍結（安全防線）
+        video.onended = () => {
+            clearTimeout(freezeTimer);
+            if (!freezeOverlay.classList.contains('active')) {
+                video.pause();
+                freezeOverlay.classList.add('active');
+                questionCard.textContent = question.questionText;
+                lockButtons();
+            }
+        };
+    }
+
+    function clearStage() {
+        clearTimeout(freezeTimer);
+        video.pause();
+        video.src = '';
+        freezeOverlay.classList.remove('active');
+        questionCard.innerHTML = '';
+        resultOverlay.classList.add('hidden');
+    }
+
+    // ========== 題目抽選 ==========
+    function pickRandomQuestion() {
+        if (usedQuestions.length >= questions.length) usedQuestions = [];
+        const available = questions.filter((_, i) => !usedQuestions.includes(i));
+        const idx = Math.floor(Math.random() * available.length);
+        const origIdx = questions.indexOf(available[idx]);
+        usedQuestions.push(origIdx);
+        return questions[origIdx];
+    }
+
+    function loadNewQuestion() {
+        const q = pickRandomQuestion();
+        loadAndPlay(q);
+    }
+
+    // ========== 按鈕控制 ==========
+    function lockButtons() {
+        buttonsLocked = true;
+        btnReady.classList.remove('btn-hidden');
+        btnCollect.classList.add('btn-locked');
+        btnTrash.classList.add('btn-locked');
+        btnDrain.classList.add('btn-locked');
+    }
+    function unlockButtons() {
+        if (!buttonsLocked) return;
+        buttonsLocked = false;
+        btnReady.classList.add('btn-hidden');
+        btnCollect.classList.remove('btn-locked');
+        btnTrash.classList.remove('btn-locked');
+        btnDrain.classList.remove('btn-locked');
+    }
+
+    function submitAnswer(bucket) {
+        if (buttonsLocked || !currentQuestion) return;
+        buttonsLocked = true;
+        const isCorrect = (bucket === currentQuestion.correct);
+        resultEmoji.textContent = isCorrect ? currentQuestion.correctEmoji : currentQuestion.wrongEmoji;
+        resultTitle.textContent = isCorrect ? '✨ 答對了！環保小尖兵！' : '哎呀，再想想看...';
+        resultTitle.className = 'result-title ' + (isCorrect ? 'correct-title' : 'wrong-title');
+        resultExplanation.textContent = currentQuestion.explanation;
+        resultOverlay.classList.remove('hidden');
+
+        btnReady.classList.add('btn-hidden');
+        btnCollect.classList.add('btn-hidden');
+        btnTrash.classList.add('btn-hidden');
+        btnDrain.classList.add('btn-hidden');
+    }
+
+    function finishAndReset() {
+        loadNewQuestion();
+    }
+
+    function resetGame() {
+        usedQuestions = [];
+        loadNewQuestion();
+    }
+
+    // ========== 初始化 ==========
+    loadNewQuestion();
+</script>
+</body>
+</html>
